@@ -1,8 +1,8 @@
-mod oscillator;
+mod voices;
 
 use nih_plug::prelude::*;
-use oscillator::Oscillator;
 use std::{num::NonZeroU32, sync::Arc};
+use voices::Voices;
 
 #[derive(Params)]
 struct FmSynthParams {
@@ -31,7 +31,7 @@ impl Default for FmSynthParams {
 struct FmSynth {
     params: Arc<FmSynthParams>,
     sample_rate: f32,
-    oscillator: Oscillator,
+    voices: Voices,
 }
 
 impl Default for FmSynth {
@@ -39,7 +39,7 @@ impl Default for FmSynth {
         FmSynth {
             params: Arc::new(FmSynthParams::default()),
             sample_rate: 1.0,
-            oscillator: Oscillator::default(),
+            voices: Voices::default(),
         }
     }
 }
@@ -93,7 +93,7 @@ impl Plugin for FmSynth {
     }
 
     fn reset(&mut self) {
-        self.oscillator.reset();
+        self.voices = Voices::default();
     }
 
     fn process(
@@ -105,21 +105,19 @@ impl Plugin for FmSynth {
         let mut next_event = context.next_event();
         for (sample_id, channel_samples) in buffer.iter_samples().enumerate() {
             // Save the data from MIDI events that we need.
-            while let Some(event) = next_event {
-                if event.timing() > sample_id as u32 {
+            while let Some(note_event) = next_event {
+                if note_event.timing() > sample_id as u32 {
                     break;
                 }
 
-                self.oscillator.set_from_midi_mut(event, self.sample_rate);
+                self.voices.from_note_event(note_event, self.sample_rate);
 
                 next_event = context.next_event();
             }
 
-            // Multiplying the gain here reduces clipping, somehow.
-            let sine = self.oscillator.calculate_sample(self.sample_rate)
-                * self.oscillator.note.gain.next();
-
+            let sine = self.voices.calculate_sines(self.sample_rate);
             let gain = self.params.gain.smoothed.next();
+
             for sample in channel_samples {
                 *sample = sine * util::db_to_gain_fast(gain)
             }
