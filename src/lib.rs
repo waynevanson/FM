@@ -1,5 +1,8 @@
+mod oscillator;
+
 use nih_plug::prelude::*;
-use std::{f32::consts, num::NonZeroU32, sync::Arc};
+use oscillator::Oscillator;
+use std::{num::NonZeroU32, sync::Arc};
 
 #[derive(Params)]
 struct FmSynthParams {
@@ -28,25 +31,7 @@ impl Default for FmSynthParams {
 struct FmSynth {
     params: Arc<FmSynthParams>,
     sample_rate: f32,
-    phase: f32,
-
-    midi_note_id: u8,
-    midi_note_freq: f32,
-    midi_note_gain: Smoother<f32>,
-}
-
-impl FmSynth {
-    fn calculate_sine(&mut self, frequency: f32) -> f32 {
-        let phase_delta = frequency / self.sample_rate;
-        let sine = (self.phase * consts::TAU).sin();
-
-        self.phase += phase_delta;
-        if self.phase >= 1.0 {
-            self.phase -= 1.0;
-        }
-
-        sine
-    }
+    oscillator: Oscillator,
 }
 
 impl Default for FmSynth {
@@ -54,12 +39,7 @@ impl Default for FmSynth {
         FmSynth {
             params: Arc::new(FmSynthParams::default()),
             sample_rate: 1.0,
-
-            phase: 0.0,
-
-            midi_note_id: 0,
-            midi_note_freq: 1.0,
-            midi_note_gain: Smoother::new(SmoothingStyle::Linear(5.0)),
+            oscillator: Oscillator::default(),
         }
     }
 }
@@ -113,10 +93,7 @@ impl Plugin for FmSynth {
     }
 
     fn reset(&mut self) {
-        self.phase = 0.0;
-        self.midi_note_id = 0;
-        self.midi_note_freq = 1.0;
-        self.midi_note_gain.reset(0.0);
+        self.oscillator.reset();
     }
 
     fn process(
@@ -126,41 +103,46 @@ impl Plugin for FmSynth {
         context: &mut impl nih_plug::prelude::ProcessContext<Self>,
     ) -> nih_plug::prelude::ProcessStatus {
         let mut next_event = context.next_event();
-
         for (sample_id, channel_samples) in buffer.iter_samples().enumerate() {
-            let gain = self.params.gain.smoothed.next();
-
-            let sine = {
-                while let Some(event) = next_event {
-                    if event.timing() > sample_id as u32 {
-                        break;
-                    }
-
-                    match event {
-                        NoteEvent::NoteOn { note, velocity, .. } => {
-                            self.midi_note_id = note;
-                            self.midi_note_freq = util::midi_note_to_freq(note);
-                            self.midi_note_gain.set_target(self.sample_rate, velocity);
-                        }
-                        NoteEvent::NoteOff { note, .. } => {
-                            if note == self.midi_note_id {
-                                self.midi_note_gain.set_target(self.sample_rate, 0.0);
-                            }
-                        }
-                        NoteEvent::PolyPressure { note, pressure, .. } => {
-                            if note == self.midi_note_id {
-                                self.midi_note_gain.set_target(self.sample_rate, pressure);
-                            }
-                        }
-                        _ => (),
-                    };
-
-                    next_event = context.next_event();
+            // Save the data from MIDI events that we need.
+            while let Some(event) = next_event {
+                if event.timing() > sample_id as u32 {
+                    break;
                 }
 
-                self.calculate_sine(self.midi_note_freq) * self.midi_note_gain.next()
-            };
+                match event {
+                    NoteEvent::NoteOn { note, velocity, .. } => {
+                        self.oscillator.note.id = note;
+                        self.oscillator.note.frequency = util::midi_note_to_freq(note);
+                        self.oscillator
+                            .note
+                            .gain
+                            .set_target(self.sample_rate, velocity);
+                    }
+                    NoteEvent::NoteOff { note, .. } => {
+                        if note == self.oscillator.note.id {
+                            self.oscillator.note.gain.set_target(self.sample_rate, 0.0);
+                        }
+                    }
+                    NoteEvent::PolyPressure { note, pressure, .. } => {
+                        if note == self.oscillator.note.id {
+                            self.oscillator
+                                .note
+                                .gain
+                                .set_target(self.sample_rate, pressure);
+                        }
+                    }
+                    _ => (),
+                };
 
+                next_event = context.next_event();
+            }
+
+            // Multiplying the gain here reduces clipping, somehow.
+            let sine = self.oscillator.calculate_sample(self.sample_rate)
+                * self.oscillator.note.gain.next();
+
+            let gain = self.params.gain.smoothed.next();
             for sample in channel_samples {
                 *sample = sine * util::db_to_gain_fast(gain)
             }
