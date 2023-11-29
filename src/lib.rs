@@ -110,30 +110,7 @@ impl Plugin for FmSynth {
                     break;
                 }
 
-                match event {
-                    NoteEvent::NoteOn { note, velocity, .. } => {
-                        self.oscillator.note.id = note;
-                        self.oscillator.note.frequency = util::midi_note_to_freq(note);
-                        self.oscillator
-                            .note
-                            .gain
-                            .set_target(self.sample_rate, velocity);
-                    }
-                    NoteEvent::NoteOff { note, .. } => {
-                        if note == self.oscillator.note.id {
-                            self.oscillator.note.gain.set_target(self.sample_rate, 0.0);
-                        }
-                    }
-                    NoteEvent::PolyPressure { note, pressure, .. } => {
-                        if note == self.oscillator.note.id {
-                            self.oscillator
-                                .note
-                                .gain
-                                .set_target(self.sample_rate, pressure);
-                        }
-                    }
-                    _ => (),
-                };
+                self.oscillator.set_from_midi_mut(event, self.sample_rate);
 
                 next_event = context.next_event();
             }

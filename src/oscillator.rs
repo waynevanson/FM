@@ -1,9 +1,9 @@
-use std::f32::consts;
-
 use nih_plug::{
+    midi::NoteEvent,
     params::smoothing::{Smoother, SmoothingStyle},
     util,
 };
+use std::f32::consts;
 
 /// A stateful oscillator that
 #[derive(Default)]
@@ -71,5 +71,26 @@ impl Oscillator {
     pub fn calculate_sample(&mut self, sample_rate: f32) -> f32 {
         self.sine.calculate_sample(self.note.frequency, sample_rate)
             * util::db_to_gain_fast(self.note.gain.next())
+    }
+
+    pub fn set_from_midi_mut(&mut self, note_event: NoteEvent<()>, sample_rate: f32) {
+        match note_event {
+            NoteEvent::NoteOn { note, velocity, .. } => {
+                self.note.id = note;
+                self.note.frequency = util::midi_note_to_freq(note);
+                self.note.gain.set_target(sample_rate, velocity);
+            }
+            NoteEvent::NoteOff { note, .. } => {
+                if note == self.note.id {
+                    self.note.gain.set_target(sample_rate, 0.0);
+                }
+            }
+            NoteEvent::PolyPressure { note, pressure, .. } => {
+                if note == self.note.id {
+                    self.note.gain.set_target(sample_rate, pressure);
+                }
+            }
+            _ => (),
+        };
     }
 }
