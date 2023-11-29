@@ -1,13 +1,15 @@
 mod voices;
 
 use nih_plug::prelude::*;
-use std::{num::NonZeroU32, sync::Arc};
+use std::{env, num::NonZeroU32, sync::Arc};
 use voices::Voices;
 
 #[derive(Params)]
 struct FmSynthParams {
     #[id = "gain"]
     pub gain: FloatParam,
+    #[id = "attack"]
+    pub attack: FloatParam,
 }
 
 impl Default for FmSynthParams {
@@ -24,6 +26,18 @@ impl Default for FmSynthParams {
             .with_smoother(SmoothingStyle::Linear(3.0))
             .with_step_size(0.01)
             .with_unit(" dB"),
+            attack: FloatParam::new(
+                "Attack",
+                0.0,
+                FloatRange::Skewed {
+                    min: 0.0,
+                    max: 1000.0,
+                    factor: FloatRange::skew_factor(-2.0),
+                },
+            )
+            .with_smoother(SmoothingStyle::Linear(5.0))
+            .with_step_size(1.0)
+            .with_unit(" Milliseconds"),
         }
     }
 }

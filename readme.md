@@ -2,6 +2,8 @@
 
 (Eventually) A polyphonic FM synthesizer.
 
+So far it's just sine waves with polyphony.
+
 # Installation
 
 To install, YOU need to build the binaries.
