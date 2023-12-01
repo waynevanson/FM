@@ -1,18 +1,33 @@
-use std::{collections::HashMap, f32::consts};
-
+use crate::envelope::Envelope;
 use nih_plug::{
     midi::NoteEvent,
     params::smoothing::{Smoother, SmoothingStyle},
     util,
 };
+use std::{collections::HashMap, f32::consts};
 
 pub struct Voice {
+    /// Milliseconds elapsed since the voice was created
+    duration: f32,
     phase: f32,
     frequency: f32,
     gain: Smoother<f32>,
 }
 
 impl Voice {
+    fn next_envelope_factor(&mut self, sample_rate: f32, envelope: &Envelope) -> f32 {
+        let _factor = if 0.0 < self.duration && self.duration < envelope.attack {
+            // milliseconds
+            let complement = self.duration / envelope.attack;
+            complement
+        } else {
+            1.0
+        };
+        let delta = 1000.0 / sample_rate;
+        self.duration += delta;
+        _factor
+    }
+
     fn next_phase(&mut self, sample_rate: f32) -> f32 {
         let phase_delta = self.frequency / sample_rate;
         self.phase += phase_delta;
@@ -22,11 +37,11 @@ impl Voice {
         self.phase
     }
 
-    pub fn next_sine(&mut self, sample_rate: f32) -> f32 {
+    pub fn next_sine(&mut self, sample_rate: f32, envelope: &Envelope) -> f32 {
         let sine = (self.phase * consts::TAU).sin();
         self.next_phase(sample_rate);
         // Multiplying the gain here reduces clipping, somehow.
-        sine * self.gain.next()
+        sine * self.gain.next() * self.next_envelope_factor(sample_rate, envelope)
     }
 }
 
@@ -42,6 +57,7 @@ impl Voices {
 
                 if !self.0.contains_key(&note) {
                     let voice = Voice {
+                        duration: 0.0,
                         frequency: util::midi_note_to_freq(note),
                         gain,
                         phase: 0.0,
@@ -62,10 +78,10 @@ impl Voices {
         };
     }
 
-    pub fn calculate_sines(&mut self, sample_rate: f32) -> f32 {
+    pub fn calculate_sines(&mut self, sample_rate: f32, envelope: &Envelope) -> f32 {
         self.0
             .values_mut()
-            .map(|voice| voice.next_sine(sample_rate))
+            .map(|voice| voice.next_sine(sample_rate, envelope))
             .fold(0.0, |first, second| first + second)
     }
 }

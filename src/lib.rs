@@ -1,5 +1,7 @@
+mod envelope;
 mod voices;
 
+use envelope::Envelope;
 use nih_plug::prelude::*;
 use std::{env, num::NonZeroU32, sync::Arc};
 use voices::Voices;
@@ -32,7 +34,7 @@ impl Default for FmSynthParams {
                 FloatRange::Skewed {
                     min: 0.0,
                     max: 1000.0,
-                    factor: FloatRange::skew_factor(-2.0),
+                    factor: FloatRange::skew_factor(-1.0),
                 },
             )
             .with_smoother(SmoothingStyle::Linear(5.0))
@@ -129,7 +131,10 @@ impl Plugin for FmSynth {
                 next_event = context.next_event();
             }
 
-            let sine = self.voices.calculate_sines(self.sample_rate);
+            let envelope = Envelope {
+                attack: self.params.attack.smoothed.next(),
+            };
+            let sine = self.voices.calculate_sines(self.sample_rate, &envelope);
             let gain = self.params.gain.smoothed.next();
 
             for sample in channel_samples {
