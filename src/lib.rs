@@ -1,48 +1,12 @@
 mod envelope;
+mod params;
+mod utility;
 mod voices;
 
-use envelope::Envelope;
 use nih_plug::prelude::*;
+use params::{FmSynthParams, FmSynthParamsSample};
 use std::{env, num::NonZeroU32, sync::Arc};
 use voices::Voices;
-
-#[derive(Params)]
-struct FmSynthParams {
-    #[id = "gain"]
-    pub gain: FloatParam,
-    #[id = "attack"]
-    pub attack: FloatParam,
-}
-
-impl Default for FmSynthParams {
-    fn default() -> Self {
-        Self {
-            gain: FloatParam::new(
-                "Gain",
-                -10.0,
-                FloatRange::Linear {
-                    min: -30.0,
-                    max: 0.0,
-                },
-            )
-            .with_smoother(SmoothingStyle::Linear(3.0))
-            .with_step_size(0.01)
-            .with_unit(" dB"),
-            attack: FloatParam::new(
-                "Attack",
-                0.0,
-                FloatRange::Skewed {
-                    min: 0.0,
-                    max: 1000.0,
-                    factor: FloatRange::skew_factor(-1.0),
-                },
-            )
-            .with_smoother(SmoothingStyle::Linear(5.0))
-            .with_step_size(1.0)
-            .with_unit(" Milliseconds"),
-        }
-    }
-}
 
 struct FmSynth {
     params: Arc<FmSynthParams>,
@@ -120,25 +84,28 @@ impl Plugin for FmSynth {
     ) -> nih_plug::prelude::ProcessStatus {
         let mut next_event = context.next_event();
         for (sample_id, channel_samples) in buffer.iter_samples().enumerate() {
+            let params = FmSynthParamsSample::from(&self.params);
             // Save the data from MIDI events that we need.
             while let Some(note_event) = next_event {
                 if note_event.timing() > sample_id as u32 {
                     break;
                 }
 
-                self.voices.from_note_event(note_event, self.sample_rate);
+                self.voices
+                    .from_note_event(note_event, self.sample_rate, &params.envelope);
 
                 next_event = context.next_event();
             }
 
-            let envelope = Envelope {
-                attack: self.params.attack.smoothed.next(),
-            };
-            let sine = self.voices.calculate_sines(self.sample_rate, &envelope);
-            let gain = self.params.gain.smoothed.next();
+            self.voices.cleanup_voices();
 
+            let sine = self
+                .voices
+                .calculate_sines(self.sample_rate, &params.envelope);
+
+            // apply the sample to all channels: mono
             for sample in channel_samples {
-                *sample = sine * util::db_to_gain_fast(gain)
+                *sample = sine * util::db_to_gain_fast(params.gain)
             }
         }
 
