@@ -1,8 +1,7 @@
-use std::sync::Arc;
-
+use crate::{envelope::Envelope, zero_to_one_float_32::ZeroToOneFloat32};
 use nih_plug::prelude::{FloatParam, FloatRange, Params, SmoothingStyle};
-
-use crate::envelope::Envelope;
+use std::sync::Arc;
+use typed_floats::PositiveFinite;
 
 #[derive(Params)]
 pub struct FmSynthParams {
@@ -85,10 +84,10 @@ impl From<&Arc<FmSynthParams>> for FmSynthParamsSample {
         Self {
             gain: params.gain.smoothed.next(),
             envelope: Envelope {
-                attack: params.attack.smoothed.next(),
-                decay: params.decay.smoothed.next(),
-                sustain: params.sustain.smoothed.next(),
-                release: params.release.smoothed.next(),
+                attack: PositiveFinite::<f32>::new(params.attack.smoothed.next()).unwrap(),
+                decay: PositiveFinite::<f32>::new(params.decay.smoothed.next()).unwrap(),
+                sustain: ZeroToOneFloat32::new(params.sustain.smoothed.next()).unwrap(),
+                release: PositiveFinite::<f32>::new(params.release.smoothed.next()).unwrap(),
             },
         }
     }

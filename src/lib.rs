@@ -2,6 +2,7 @@ mod envelope;
 mod params;
 mod utility;
 mod voices;
+mod zero_to_one_float_32;
 
 use nih_plug::prelude::*;
 use params::{FmSynthParams, FmSynthParamsSample};
@@ -73,7 +74,7 @@ impl Plugin for FmSynth {
     }
 
     fn reset(&mut self) {
-        self.voices = Voices::default();
+        self.voices.cleanup_voices();
     }
 
     fn process(

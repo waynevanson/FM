@@ -1,6 +1,6 @@
 use std::ops::RangeInclusive;
 
-pub fn scale_float(
+pub fn scale_linearly(
     source: f32,
     source_range: RangeInclusive<f32>,
     target_range: RangeInclusive<f32>,

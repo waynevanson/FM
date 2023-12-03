@@ -10,6 +10,9 @@ members = ["xtask"]
 [lib]
 crate-type = ["cdylib"]
 
+[dependencies]
+typed_floats = "0.7.3"
+
 [dependencies.nih_plug]
 git = "https://github.com/robbert-vdh/nih-plug.git"
 branch = "master"

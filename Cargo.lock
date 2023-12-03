@@ -217,6 +217,7 @@ name = "fm"
 version = "0.1.0"
 dependencies = [
  "nih_plug",
+ "typed_floats",
 ]
 
 [[package]]
@@ -693,6 +694,26 @@ dependencies = [
  "serde_spanned",
  "toml_datetime",
  "winnow",
+]
+
+[[package]]
+name = "typed_floats"
+version = "0.7.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e32c705135e1482ccfff044f56173d4b574ef985679c880c9130fb6a69d89bb5"
+dependencies = [
+ "typed_floats_macros",
+]
+
+[[package]]
+name = "typed_floats_macros"
+version = "0.7.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5c120454dbeaee0d46a640e116b28b505ac2fb039e168e79290709e3d0b6983c"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.39",
 ]
 
 [[package]]
