@@ -5,6 +5,7 @@ use nih_plug::prelude::*;
 #[derive(Debug, Clone, Copy)]
 enum Phase {
     Attack,
+    Decay,
     Release,
 }
 
@@ -39,6 +40,17 @@ where
 
     pub fn is_released(&self) -> bool {
         matches!(self.phase, Some(Phase::Release)) && self.gain.previous_value() == T::from_f32(0.0)
+    }
+
+    pub fn next_decay(&mut self, sample_rate: f32, decay: f32, sustain: T) {
+        let is_max = self.gain.previous_value() == T::from_f32(1.0);
+        let is_attack = matches!(self.phase, Some(Phase::Attack));
+
+        if is_max && is_attack {
+            self.phase = Some(Phase::Decay);
+            self.gain.style = SmoothingStyle::Exponential(decay);
+            self.gain.set_target(sample_rate, sustain);
+        }
     }
 
     /// Produce smoothed values for an entire block of audio. This is useful when iterating the same

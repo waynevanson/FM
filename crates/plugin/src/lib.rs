@@ -40,6 +40,10 @@ struct PolyModSynthParams {
     /// The amplitude envelope attack time. This is the same for every voice.
     #[id = "amp_atk"]
     amp_attack_ms: FloatParam,
+    #[id = "amp_dec"]
+    amp_decay_ms: FloatParam,
+    #[id = "amp_sus"]
+    amp_sustain_percentage: FloatParam,
     /// The amplitude envelope release time. This is the same for every voice.
     #[id = "amp_rel"]
     amp_release_ms: FloatParam,
@@ -138,6 +142,27 @@ impl Default for PolyModSynthParams {
             )
             .with_step_size(0.1)
             .with_unit(" ms"),
+            amp_decay_ms: FloatParam::new(
+                "Decay",
+                100.0,
+                FloatRange::Skewed {
+                    min: 0.0,
+                    max: 2000.0,
+                    factor: FloatRange::skew_factor(-1.0),
+                },
+            )
+            .with_step_size(0.1)
+            .with_unit(" ms"),
+            amp_sustain_percentage: FloatParam::new(
+                "Sustain",
+                90.0,
+                FloatRange::Linear {
+                    min: 0.0,
+                    max: 100.0,
+                },
+            )
+            .with_step_size(0.1)
+            .with_unit(" %"),
         }
     }
 }
@@ -367,6 +392,8 @@ impl Plugin for PolyModSynth {
             let mut voice_gain = [0.0; MAX_BLOCK_SIZE];
             let mut voice_amp_envelope = [0.0; MAX_BLOCK_SIZE];
             self.params.gain.smoothed.next_block(&mut gain, block_len);
+            let decay = self.params.amp_decay_ms.value();
+            let sustain = self.params.amp_sustain_percentage.value() / 100.0;
 
             // TODO: Some form of band limiting
             // TODO: Filter
@@ -382,7 +409,7 @@ impl Plugin for PolyModSynth {
                     None => &gain,
                 };
 
-                // This is an exponential smoother repurposed as an AR envelope with values between
+                // This is an exponential smoother repurposed as an ADSR envelope with values between
                 // 0 and 1. When a note off event is received, this envelope will start fading out
                 // again. When it reaches 0, we will terminate the voice.
                 voice
@@ -421,6 +448,10 @@ impl Plugin for PolyModSynth {
                     _ => (),
                 }
             }
+
+            self.voices.iter_mut().flatten().for_each(|voice| {
+                voice.amp_envelope.next_decay(sample_rate, decay, sustain);
+            });
 
             // And then just keep processing blocks until we've run out of buffer to fill
             block_start = block_end;
