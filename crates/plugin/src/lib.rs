@@ -40,6 +40,8 @@ struct PolyModSynthParams {
     /// The amplitude envelope attack time. This is the same for every voice.
     #[id = "amp_atk"]
     amp_attack_ms: FloatParam,
+    #[id = "amp_hol"]
+    amp_hold_ms: FloatParam,
     #[id = "amp_dec"]
     amp_decay_ms: FloatParam,
     #[id = "amp_sus"]
@@ -163,6 +165,17 @@ impl Default for PolyModSynthParams {
             )
             .with_step_size(0.1)
             .with_unit(" %"),
+            amp_hold_ms: FloatParam::new(
+                "Hold",
+                100.0,
+                FloatRange::Skewed {
+                    min: 0.0,
+                    max: 2000.0,
+                    factor: FloatRange::skew_factor(-1.0),
+                },
+            )
+            .with_step_size(0.1)
+            .with_unit(" ms"),
         }
     }
 }
@@ -229,6 +242,10 @@ impl Plugin for PolyModSynth {
             // has an internal note ID that's great than or equal to this one, then we should start
             // the note's smoother at the new value instead of fading in from the global value.
             let this_sample_internal_voice_id_start = self.next_internal_voice_id;
+            let hold = self.params.amp_hold_ms.value();
+            let decay = self.params.amp_decay_ms.value();
+            let sustain = self.params.amp_sustain_percentage.value() / 100.0;
+
             'events: loop {
                 match next_event {
                     // If the event happens now, then we'll keep processing events
@@ -252,7 +269,13 @@ impl Plugin for PolyModSynth {
                                 voice.phase_delta = util::midi_note_to_freq(note) / sample_rate;
 
                                 // This starts with the attack portion of the amplitude envelope
-                                voice.amp_envelope.note_on(sample_rate, attack);
+                                voice.amp_envelope.note_on(
+                                    sample_rate,
+                                    attack,
+                                    hold,
+                                    decay,
+                                    sustain,
+                                );
                             }
                             NoteEvent::NoteOff {
                                 timing: _,
@@ -392,8 +415,6 @@ impl Plugin for PolyModSynth {
             let mut voice_gain = [0.0; MAX_BLOCK_SIZE];
             let mut voice_amp_envelope = [0.0; MAX_BLOCK_SIZE];
             self.params.gain.smoothed.next_block(&mut gain, block_len);
-            let decay = self.params.amp_decay_ms.value();
-            let sustain = self.params.amp_sustain_percentage.value() / 100.0;
 
             // TODO: Some form of band limiting
             // TODO: Filter
@@ -427,6 +448,10 @@ impl Plugin for PolyModSynth {
 
                     output[0][sample_idx] += sample;
                     output[1][sample_idx] += sample;
+
+                    voice
+                        .amp_envelope
+                        .next_phase(sample_rate, hold, decay, sustain);
                 }
             }
 
@@ -448,10 +473,6 @@ impl Plugin for PolyModSynth {
                     _ => (),
                 }
             }
-
-            self.voices.iter_mut().flatten().for_each(|voice| {
-                voice.amp_envelope.next_decay(sample_rate, decay, sustain);
-            });
 
             // And then just keep processing blocks until we've run out of buffer to fill
             block_start = block_end;

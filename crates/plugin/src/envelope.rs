@@ -5,6 +5,7 @@ use nih_plug::prelude::*;
 #[derive(Debug, Clone, Copy)]
 enum Phase {
     Attack,
+    Hold { remaining_ms: f32 },
     Decay,
     Release,
 }
@@ -24,12 +25,34 @@ where
     T: Smoothable + Debug + PartialEq,
     T::Atomic: Default + Debug,
 {
-    pub fn note_on(&mut self, sample_rate: f32, attack: f32) {
-        self.gain = Smoother::new(SmoothingStyle::Exponential(attack));
-        self.gain.reset(T::from_f32(0.0));
-        self.gain.set_target(sample_rate, T::from_f32(1.0));
+    pub fn note_on(&mut self, sample_rate: f32, attack: f32, hold: f32, decay: f32, sustain: T) {
+        if attack > 0.0 {
+            self.gain.style = SmoothingStyle::Exponential(attack);
 
-        self.phase = Some(Phase::Attack);
+            self.gain.reset(T::from_f32(0.0));
+            self.gain.set_target(sample_rate, T::from_f32(1.0));
+
+            self.phase = Phase::Attack.into();
+        } else if hold > 0.0 {
+            self.gain.style = SmoothingStyle::Linear(1.0);
+
+            self.gain.reset(T::from_f32(1.0));
+
+            self.phase = Phase::Hold { remaining_ms: hold }.into();
+        } else if decay > 0.0 {
+            self.gain.style = SmoothingStyle::Exponential(decay);
+
+            self.gain.reset(T::from_f32(1.0));
+            self.gain.set_target(sample_rate, sustain);
+
+            self.phase = Phase::Decay.into();
+        } else {
+            self.gain.style = SmoothingStyle::Exponential(decay);
+
+            self.gain.reset(sustain);
+
+            self.phase = Phase::Decay.into();
+        }
     }
 
     pub fn note_off(&mut self, sample_rate: f32, release: f32) {
@@ -42,14 +65,37 @@ where
         matches!(self.phase, Some(Phase::Release)) && self.gain.previous_value() == T::from_f32(0.0)
     }
 
-    pub fn next_decay(&mut self, sample_rate: f32, decay: f32, sustain: T) {
+    pub fn next_phase(&mut self, sample_rate: f32, hold: f32, decay: f32, sustain: T) {
         let is_max = self.gain.previous_value() == T::from_f32(1.0);
-        let is_attack = matches!(self.phase, Some(Phase::Attack));
 
-        if is_max && is_attack {
-            self.phase = Some(Phase::Decay);
-            self.gain.style = SmoothingStyle::Exponential(decay);
-            self.gain.set_target(sample_rate, sustain);
+        if !is_max {
+            return;
+        }
+
+        match &mut self.phase {
+            Some(Phase::Attack) => {
+                self.phase = if hold > 0.0 {
+                    Phase::Hold { remaining_ms: hold }
+                } else {
+                    self.gain.style = SmoothingStyle::Exponential(decay);
+
+                    self.gain.set_target(sample_rate, sustain);
+                    Phase::Decay
+                }
+                .into();
+            }
+            Some(Phase::Hold { remaining_ms }) => {
+                *remaining_ms -= 1000.0 / sample_rate;
+                // Keep holding unless ms below 0.
+                if remaining_ms > &mut 0.0 {
+                    return;
+                }
+
+                self.phase = Some(Phase::Decay);
+                self.gain.style = SmoothingStyle::Exponential(decay);
+                self.gain.set_target(sample_rate, sustain);
+            }
+            _ => (),
         }
     }
 
