@@ -1,3 +1,6 @@
+mod envelope;
+
+use envelope::Envelope;
 use nih_plug::prelude::*;
 use rand::Rng;
 use rand_pcg::Pcg32;
@@ -63,15 +66,14 @@ struct Voice {
 
     /// The voice's current phase. This is randomized at the start of the voice
     phase: f32,
+
     /// The phase increment. This is based on the voice's frequency, derived from the note index.
     /// Since we don't support pitch expressions or pitch bend, this value stays constant for the
     /// duration of the voice.
     phase_delta: f32,
-    /// Whether the key has been released and the voice is in its release stage. The voice will be
-    /// terminated when the amplitude envelope hits 0 while the note is releasing.
-    releasing: bool,
+
     /// Fades between 0 and 1 with timings based on the global attack and release settings.
-    amp_envelope: Smoother<f32>,
+    amp_envelope: Envelope<f32>,
 
     /// If this voice has polyphonic gain modulation applied, then this contains the normalized
     /// offset and a smoother.
@@ -141,10 +143,10 @@ impl Default for PolyModSynthParams {
 }
 
 impl Plugin for PolyModSynth {
-    const NAME: &'static str = "Poly Mod Synth";
-    const VENDOR: &'static str = "Moist Plugins GmbH";
+    const NAME: &'static str = "FM";
+    const VENDOR: &'static str = "Wayne Van Son";
     const URL: &'static str = "https://youtu.be/dQw4w9WgXcQ";
-    const EMAIL: &'static str = "info@example.com";
+    const EMAIL: &'static str = "waynevanson@gmail.com";
 
     const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
@@ -217,19 +219,15 @@ impl Plugin for PolyModSynth {
                                 velocity,
                             } => {
                                 let initial_phase: f32 = self.prng.gen();
-                                // This starts with the attack portion of the amplitude envelope
-                                let amp_envelope = Smoother::new(SmoothingStyle::Exponential(
-                                    self.params.amp_attack_ms.value(),
-                                ));
-                                amp_envelope.reset(0.0);
-                                amp_envelope.set_target(sample_rate, 1.0);
-
+                                let attack = self.params.amp_attack_ms.value();
                                 let voice =
                                     self.start_voice(context, timing, voice_id, channel, note);
                                 voice.velocity_sqrt = velocity.sqrt();
                                 voice.phase = initial_phase;
                                 voice.phase_delta = util::midi_note_to_freq(note) / sample_rate;
-                                voice.amp_envelope = amp_envelope;
+
+                                // This starts with the attack portion of the amplitude envelope
+                                voice.amp_envelope.note_on(sample_rate, attack);
                             }
                             NoteEvent::NoteOff {
                                 timing: _,
@@ -409,7 +407,7 @@ impl Plugin for PolyModSynth {
             // the previous loop but this is simpler.
             for voice in self.voices.iter_mut() {
                 match voice {
-                    Some(v) if v.releasing && v.amp_envelope.previous_value() == 0.0 => {
+                    Some(v) if v.amp_envelope.is_released() => {
                         // This event is very important, as it allows the host to manage its own modulation
                         // voices
                         context.send_event(NoteEvent::VoiceTerminated {
@@ -461,8 +459,7 @@ impl PolyModSynth {
 
             phase: 0.0,
             phase_delta: 0.0,
-            releasing: false,
-            amp_envelope: Smoother::none(),
+            amp_envelope: Envelope::default(),
 
             voice_gain: None,
         };
@@ -519,16 +516,12 @@ impl PolyModSynth {
                     voice_id: candidate_voice_id,
                     channel: candidate_channel,
                     note: candidate_note,
-                    releasing,
                     amp_envelope,
                     ..
                 }) if voice_id == Some(*candidate_voice_id)
                     || (channel == *candidate_channel && note == *candidate_note) =>
                 {
-                    *releasing = true;
-                    amp_envelope.style =
-                        SmoothingStyle::Exponential(self.params.amp_release_ms.value());
-                    amp_envelope.set_target(sample_rate, 0.0);
+                    amp_envelope.note_off(sample_rate, self.params.amp_release_ms.value());
 
                     // If this targetted a single voice ID, we're done here. Otherwise there may be
                     // multiple overlapping voices as we enabled support for that in the
@@ -589,7 +582,7 @@ const fn compute_fallback_voice_id(note: u8, channel: u8) -> i32 {
 }
 
 impl ClapPlugin for PolyModSynth {
-    const CLAP_ID: &'static str = "com.moist-plugins-gmbh.poly-mod-synth";
+    const CLAP_ID: &'static str = "com.waynevanson.fm";
     const CLAP_DESCRIPTION: Option<&'static str> =
         Some("A simple polyphonic synthesizer with support for polyphonic modulation");
     const CLAP_MANUAL_URL: Option<&'static str> = Some(Self::URL);
@@ -614,7 +607,7 @@ impl ClapPlugin for PolyModSynth {
 // The VST3 verison of this plugin isn't too interesting as it will not support polyphonic
 // modulation
 impl Vst3Plugin for PolyModSynth {
-    const VST3_CLASS_ID: [u8; 16] = *b"PolyM0dSynth1337";
+    const VST3_CLASS_ID: [u8; 16] = *b"Wynvenavs32sssfm";
     const VST3_SUBCATEGORIES: &'static [Vst3SubCategory] = &[
         Vst3SubCategory::Instrument,
         Vst3SubCategory::Synth,
