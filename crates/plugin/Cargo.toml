@@ -11,6 +11,7 @@ crate-type = ["cdylib"]
 [dependencies]
 nih_plug = { git = "https://github.com/robbert-vdh/nih-plug.git", features = [
     "assert_process_allocs",
+    "vst3",
 ] }
 rand = "0.8.5"
 rand_pcg = "0.3.1"
