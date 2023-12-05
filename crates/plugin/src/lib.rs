@@ -6,7 +6,7 @@ use nih_plug::prelude::*;
 use params::PolyModSynthParams;
 use rand::Rng;
 use rand_pcg::Pcg32;
-use std::sync::Arc;
+use std::{f32::consts, sync::Arc};
 
 /// The number of simultaneous voices for this synth.
 const NUM_VOICES: u32 = 16;
@@ -117,6 +117,10 @@ impl Plugin for PolyModSynth {
 
         self.voices.fill(None);
         self.next_internal_voice_id = 0;
+    }
+
+    fn editor(&mut self, async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
+        None
     }
 
     fn process(
@@ -342,7 +346,12 @@ impl Plugin for PolyModSynth {
 
                 for (value_idx, sample_idx) in (block_start..block_end).enumerate() {
                     let amp = voice.velocity_sqrt * gain[value_idx] * voice_amp_envelope[value_idx];
-                    let sample = (voice.phase * 2.0 - 1.0) * amp;
+
+                    // Linearly scales a number from [0, 1] to [-3, 1]
+                    // let sample = (voice.phase * 2.0 - 1.0) * amp;
+
+                    // Sine wave generator
+                    let sample = (voice.phase * consts::TAU).sin() * amp;
 
                     voice.phase += voice.phase_delta;
                     if voice.phase >= 1.0 {
