@@ -1,13 +1,16 @@
 mod envelope;
+mod params;
 
 use envelope::Envelope;
 use nih_plug::prelude::*;
+use params::PolyModSynthParams;
 use rand::Rng;
 use rand_pcg::Pcg32;
 use std::sync::Arc;
 
 /// The number of simultaneous voices for this synth.
 const NUM_VOICES: u32 = 16;
+
 /// The maximum size of an audio block. We'll split up the audio in blocks and render smoothed
 /// values to buffers since these values may need to be reused for multiple voices.
 const MAX_BLOCK_SIZE: usize = 64;
@@ -15,7 +18,7 @@ const MAX_BLOCK_SIZE: usize = 64;
 // Polyphonic modulation works by assigning integer IDs to parameters. Pattern matching on these in
 // `PolyModulation` and `MonoAutomation` events makes it possible to easily link these events to the
 // correct parameter.
-const GAIN_POLY_MOD_ID: u32 = 0;
+pub const GAIN_POLY_MOD_ID: u32 = 0;
 
 /// A simple polyphonic synthesizer with support for CLAP's polyphonic modulation. See
 /// `NoteEvent::PolyModulation` for another source of information on how to use this.
@@ -30,25 +33,6 @@ struct PolyModSynth {
     /// The next internal voice ID, used only to figure out the oldest voice for voice stealing.
     /// This is incremented by one each time a voice is created.
     next_internal_voice_id: u64,
-}
-
-#[derive(Params)]
-struct PolyModSynthParams {
-    /// A voice's gain. This can be polyphonically modulated.
-    #[id = "gain"]
-    gain: FloatParam,
-    /// The amplitude envelope attack time. This is the same for every voice.
-    #[id = "amp_atk"]
-    amp_attack_ms: FloatParam,
-    #[id = "amp_hol"]
-    amp_hold_ms: FloatParam,
-    #[id = "amp_dec"]
-    amp_decay_ms: FloatParam,
-    #[id = "amp_sus"]
-    amp_sustain_percentage: FloatParam,
-    /// The amplitude envelope release time. This is the same for every voice.
-    #[id = "amp_rel"]
-    amp_release_ms: FloatParam,
 }
 
 /// Data for a single synth voice. In a real synth where performance matter, you may want to use a
@@ -95,87 +79,6 @@ impl Default for PolyModSynth {
             // `[None; N]` requires the `Some(T)` to be `Copy`able
             voices: [0; NUM_VOICES as usize].map(|_| None),
             next_internal_voice_id: 0,
-        }
-    }
-}
-
-impl Default for PolyModSynthParams {
-    fn default() -> Self {
-        Self {
-            gain: FloatParam::new(
-                "Gain",
-                util::db_to_gain(-12.0),
-                // Because we're representing gain as decibels the range is already logarithmic
-                FloatRange::Linear {
-                    min: util::db_to_gain(-36.0),
-                    max: util::db_to_gain(0.0),
-                },
-            )
-            // This enables polyphonic mdoulation for this parameter by representing all related
-            // events with this ID. After enabling this, the plugin **must** start sending
-            // `VoiceTerminated` events to the host whenever a voice has ended.
-            .with_poly_modulation_id(GAIN_POLY_MOD_ID)
-            .with_smoother(SmoothingStyle::Logarithmic(5.0))
-            .with_unit(" dB")
-            .with_value_to_string(formatters::v2s_f32_gain_to_db(2))
-            .with_string_to_value(formatters::s2v_f32_gain_to_db()),
-            amp_attack_ms: FloatParam::new(
-                "Attack",
-                200.0,
-                FloatRange::Skewed {
-                    min: 0.0,
-                    max: 2000.0,
-                    factor: FloatRange::skew_factor(-1.0),
-                },
-            )
-            // These parameters are global (and they cannot be changed once the voice has started).
-            // They also don't need any smoothing themselves because they affect smoothing
-            // coefficients.
-            .with_step_size(0.1)
-            .with_unit(" ms"),
-            amp_release_ms: FloatParam::new(
-                "Release",
-                100.0,
-                FloatRange::Skewed {
-                    min: 0.0,
-                    max: 2000.0,
-                    factor: FloatRange::skew_factor(-1.0),
-                },
-            )
-            .with_step_size(0.1)
-            .with_unit(" ms"),
-            amp_decay_ms: FloatParam::new(
-                "Decay",
-                100.0,
-                FloatRange::Skewed {
-                    min: 0.0,
-                    max: 2000.0,
-                    factor: FloatRange::skew_factor(-1.0),
-                },
-            )
-            .with_step_size(0.1)
-            .with_unit(" ms"),
-            amp_sustain_percentage: FloatParam::new(
-                "Sustain",
-                90.0,
-                FloatRange::Linear {
-                    min: 0.0,
-                    max: 100.0,
-                },
-            )
-            .with_step_size(0.1)
-            .with_unit(" %"),
-            amp_hold_ms: FloatParam::new(
-                "Hold",
-                100.0,
-                FloatRange::Skewed {
-                    min: 0.0,
-                    max: 2000.0,
-                    factor: FloatRange::skew_factor(-1.0),
-                },
-            )
-            .with_step_size(0.1)
-            .with_unit(" ms"),
         }
     }
 }
