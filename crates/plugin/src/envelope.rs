@@ -1,6 +1,5 @@
-use std::fmt::Debug;
-
 use nih_plug::prelude::*;
+use std::fmt::Debug;
 
 #[derive(Debug, Clone, Copy)]
 enum Phase {

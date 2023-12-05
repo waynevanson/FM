@@ -119,7 +119,7 @@ impl Plugin for PolyModSynth {
         self.next_internal_voice_id = 0;
     }
 
-    fn editor(&mut self, async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
+    fn editor(&mut self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
         None
     }
 
@@ -420,11 +420,9 @@ impl PolyModSynth {
             channel,
             note,
             velocity_sqrt: 1.0,
-
             phase: 0.0,
             phase_delta: 0.0,
             amp_envelope: Envelope::default(),
-
             voice_gain: None,
         };
         self.next_internal_voice_id = self.next_internal_voice_id.wrapping_add(1);
