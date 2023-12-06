@@ -1,8 +1,12 @@
 use crate::GAIN_POLY_MOD_ID;
 use nih_plug::prelude::*;
+use nih_plug_iced::IcedState;
+use std::sync::Arc;
 
 #[derive(Params)]
-pub struct PolyModSynthParams {
+pub struct FmSynthParams {
+    #[persist = "editor-state"]
+    pub editor_state: Arc<IcedState>,
     /// A voice's gain. This can be polyphonically modulated.
     #[id = "gain"]
     pub gain: FloatParam,
@@ -20,9 +24,11 @@ pub struct PolyModSynthParams {
     pub amp_release_ms: FloatParam,
 }
 
-impl Default for PolyModSynthParams {
+impl Default for FmSynthParams {
     fn default() -> Self {
         Self {
+            // 16/9 ratio but for ants.
+            editor_state: IcedState::from_size(720, 405),
             gain: FloatParam::new(
                 "Gain",
                 util::db_to_gain(-12.0),

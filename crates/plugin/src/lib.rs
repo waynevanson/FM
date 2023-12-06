@@ -1,9 +1,12 @@
+mod editor;
 mod envelope;
 mod params;
 
+use editor::FmSynthEditor;
 use envelope::Envelope;
 use nih_plug::prelude::*;
-use params::PolyModSynthParams;
+use nih_plug_iced::create_iced_editor;
+use params::FmSynthParams;
 use rand::Rng;
 use rand_pcg::Pcg32;
 use std::{f32::consts, sync::Arc};
@@ -23,8 +26,7 @@ pub const GAIN_POLY_MOD_ID: u32 = 0;
 /// A simple polyphonic synthesizer with support for CLAP's polyphonic modulation. See
 /// `NoteEvent::PolyModulation` for another source of information on how to use this.
 struct PolyModSynth {
-    params: Arc<PolyModSynthParams>,
-
+    params: Arc<FmSynthParams>,
     /// A pseudo-random number generator. This will always be reseeded with the same seed when the
     /// synth is reset. That way the output is deterministic when rendering multiple times.
     prng: Pcg32,
@@ -73,7 +75,7 @@ struct Voice {
 impl Default for PolyModSynth {
     fn default() -> Self {
         Self {
-            params: Arc::new(PolyModSynthParams::default()),
+            params: Arc::new(FmSynthParams::default()),
 
             prng: Pcg32::new(420, 1337),
             // `[None; N]` requires the `Some(T)` to be `Copy`able
@@ -120,7 +122,7 @@ impl Plugin for PolyModSynth {
     }
 
     fn editor(&mut self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
-        None
+        create_iced_editor::<FmSynthEditor>(self.params.editor_state.clone(), self.params.clone())
     }
 
     fn process(
