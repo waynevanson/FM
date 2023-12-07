@@ -21,7 +21,7 @@ pub struct NoteEventBlockIter<'context, 'buffer, 'plugin, Context, Plugin>
 where
     Plugin: PluginTrait,
 {
-    next_event: Option<PluginNoteEvent<Plugin>>,
+    previous_event: Option<PluginNoteEvent<Plugin>>,
     block_start: usize,
     block_end: usize,
     buffer: &'buffer mut Buffer<'plugin>,
@@ -43,7 +43,7 @@ where
     ) -> Self {
         let num_samples = buffer.samples();
         Self {
-            next_event: None,
+            previous_event: None,
             context,
             block_start: 0,
             buffer,
@@ -62,23 +62,20 @@ where
     type Item = (PluginNoteEvent<Plugin>, NoteEventSampleIter);
 
     fn next(&mut self) -> Option<Self::Item> {
-        // Always `None` when created, and we need `next_event` to maybe have a value.
-        if let None = self.next_event {
-            self.next_event = self.context.next_event();
-        }
+        // We actually want to process the current event, not the previous.
+        self.previous_event = self.context.next_event();
 
         // There are no more blocks to process.
         if self.block_start < self.buffer.samples() {
             return None;
         }
 
-        match &self.next_event {
+        // this is now the current event
+        match &self.previous_event {
             // Event has happened before the start of the block,
             // so we can consume it.
             Some(event) if (event.timing() as usize) <= self.block_start => {
-                let event = event.to_owned();
-                self.next_event = self.context.next_event();
-                Some((event, NoteEventSampleIter {}))
+                Some((event.to_owned(), NoteEventSampleIter {}))
             }
 
             // Stop iterating events in the current block by cutting the block short.
