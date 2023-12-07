@@ -117,7 +117,7 @@ dependencies = [
  "keyboard-types",
  "nix 0.22.3",
  "objc",
- "raw-window-handle",
+ "raw-window-handle 0.4.3",
  "uuid",
  "winapi",
  "x11",
@@ -643,7 +643,7 @@ dependencies = [
  "iced_graphics",
  "iced_native",
  "keyboard-types",
- "raw-window-handle",
+ "raw-window-handle 0.4.3",
 ]
 
 [[package]]
@@ -690,7 +690,7 @@ dependencies = [
  "glam",
  "iced_native",
  "iced_style",
- "raw-window-handle",
+ "raw-window-handle 0.4.3",
  "thiserror",
 ]
 
@@ -888,7 +888,7 @@ dependencies = [
 [[package]]
 name = "nih_plug"
 version = "0.0.0"
-source = "git+https://github.com/waynevanson/nih-plug.git?branch=fix/iced-baseview-version#cbbed2c7600813870bfdad9b95446a56a509f6ac"
+source = "git+https://github.com/robbert-vdh/nih-plug.git?branch=vizia-update#cd5b2592a80c2981f038c36fd0c530771a2d7414"
 dependencies = [
  "anyhow",
  "anymap",
@@ -909,7 +909,7 @@ dependencies = [
  "nih_plug_derive",
  "objc",
  "parking_lot 0.12.1",
- "raw-window-handle",
+ "raw-window-handle 0.5.2",
  "serde",
  "serde_json",
  "vst3-sys",
@@ -925,7 +925,7 @@ source = "git+https://github.com/robbert-vdh/nih_plug_assets.git#a04e327923e120b
 [[package]]
 name = "nih_plug_derive"
 version = "0.1.0"
-source = "git+https://github.com/waynevanson/nih-plug.git?branch=fix/iced-baseview-version#cbbed2c7600813870bfdad9b95446a56a509f6ac"
+source = "git+https://github.com/robbert-vdh/nih-plug.git?branch=vizia-update#cd5b2592a80c2981f038c36fd0c530771a2d7414"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -935,7 +935,7 @@ dependencies = [
 [[package]]
 name = "nih_plug_iced"
 version = "0.0.0"
-source = "git+https://github.com/waynevanson/nih-plug.git?branch=fix/iced-baseview-version#cbbed2c7600813870bfdad9b95446a56a509f6ac"
+source = "git+https://github.com/robbert-vdh/nih-plug.git?branch=vizia-update#cd5b2592a80c2981f038c36fd0c530771a2d7414"
 dependencies = [
  "atomic_refcell",
  "baseview",
@@ -943,6 +943,7 @@ dependencies = [
  "iced_baseview",
  "nih_plug",
  "nih_plug_assets",
+ "raw-window-handle 0.4.3",
  "serde",
 ]
 
@@ -1241,6 +1242,12 @@ checksum = "b800beb9b6e7d2df1fe337c9e3d04e3af22a124460fb4c30fcc22c9117cefb41"
 dependencies = [
  "cty",
 ]
+
+[[package]]
+name = "raw-window-handle"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f2ff9a1f06a88b01621b7ae906ef0211290d1c8a168a15542486a8f61c0833b9"
 
 [[package]]
 name = "rayon"

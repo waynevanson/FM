@@ -9,18 +9,11 @@ license = "ISC"
 crate-type = ["cdylib"]
 
 [dependencies]
-# # Uncomment when upstream closes this: https://github.com/robbert-vdh/nih-plug/pull/97
-# nih_plug = { git = "https://github.com/robbert-vdh/nih-plug.git", features = [
-#     "assert_process_allocs",
-#     "vst3",
-# ] }
-# nih_plug_iced = { git = "https://github.com/robbert-vdh/nih-plug.git" }
-
-nih_plug = { git = "https://github.com/waynevanson/nih-plug.git", branch = "fix/iced-baseview-version", features = [
+nih_plug = { git = "https://github.com/robbert-vdh/nih-plug.git", branch = "vizia-update", features = [
     "assert_process_allocs",
     "vst3",
 ] }
-nih_plug_iced = { git = "https://github.com/waynevanson/nih-plug.git", branch = "fix/iced-baseview-version" }
+nih_plug_iced = { git = "https://github.com/robbert-vdh/nih-plug.git", branch = "vizia-update" }
 
 rand = "0.8.5"
 rand_pcg = "0.3.1"
