@@ -2,7 +2,7 @@
 name = "fm"
 version = "0.1.0"
 edition = "2021"
-authors = ["Robbert van der Helm <mail@robbertvanderhelm.nl>"]
+authors = ["Wayne Van Son <waynevanson@gmail.com>"]
 license = "ISC"
 
 [lib]
