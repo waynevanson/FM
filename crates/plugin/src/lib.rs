@@ -1,5 +1,7 @@
 mod editor;
 mod envelope;
+mod note_event_block_iter;
+mod note_event_sample_iter;
 mod params;
 
 use editor::FmSynthEditor;
@@ -143,6 +145,14 @@ impl Plugin for PolyModSynth {
         let mut next_event = context.next_event();
         let mut block_start: usize = 0;
         let mut block_end: usize = MAX_BLOCK_SIZE.min(num_samples);
+
+        // block
+        // for (note_event, sample_iter) in NoteEventBlockIter::new(context, buffer, MAX_BLOCK_SIZE) {
+        //     // sample
+        //     // for sample in sample_iter {}
+        // }
+
+        // Iterates per block.
         while block_start < num_samples {
             // First of all, handle all note events that happen at the start of the block, and cut
             // the block short if another event happens before the end of it. To handle polyphonic
@@ -346,6 +356,7 @@ impl Plugin for PolyModSynth {
                     .amp_envelope
                     .next_block(&mut voice_amp_envelope, block_len);
 
+                // All samples within a block.
                 for (value_idx, sample_idx) in (block_start..block_end).enumerate() {
                     let amp = voice.velocity_sqrt * gain[value_idx] * voice_amp_envelope[value_idx];
 
