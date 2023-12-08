@@ -9,6 +9,7 @@ license = "ISC"
 crate-type = ["cdylib"]
 
 [dependencies]
+fixed-capacity-vec = "1.0.1"
 nih_plug = { git = "https://github.com/robbert-vdh/nih-plug.git", branch = "vizia-update", features = [
     "assert_process_allocs",
     "vst3",
