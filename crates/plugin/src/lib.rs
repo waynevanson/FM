@@ -1,6 +1,5 @@
 mod editor;
 mod envelope;
-mod note_event_block_iter;
 mod params;
 
 use editor::FmSynthEditor;
