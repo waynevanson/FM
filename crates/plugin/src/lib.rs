@@ -144,12 +144,8 @@ impl Plugin for PolyModSynth {
         let mut block_start: usize = 0;
         let mut block_end: usize = MAX_BLOCK_SIZE.min(num_samples);
 
-        // block
-        // for (note_event, sample_iter) in NoteEventBlockIter::new(context, buffer, MAX_BLOCK_SIZE) {
-        //     // sample
-        //     // for sample in sample_iter {}
-        // }
-
+        // buffer.iter_samples()
+        //
         // Iterates per block.
         while block_start < num_samples {
             // First of all, handle all note events that happen at the start of the block, and cut
@@ -319,8 +315,9 @@ impl Plugin for PolyModSynth {
             }
 
             // We'll start with silence, and then add the output from the active voices
-            output[0][block_start..block_end].fill(0.0);
-            output[1][block_start..block_end].fill(0.0);
+            for channel in output.iter_mut() {
+                channel[block_start..block_end].fill(0.0);
+            }
 
             // These are the smoothed global parameter values. These are used for voices that do not
             // have polyphonic modulation applied to them. With a plugin as simple as this it would
@@ -369,8 +366,9 @@ impl Plugin for PolyModSynth {
                         voice.phase -= 1.0;
                     }
 
-                    output[0][sample_idx] += sample;
-                    output[1][sample_idx] += sample;
+                    for channel in output.iter_mut() {
+                        channel[sample_idx] += sample;
+                    }
 
                     voice
                         .amp_envelope
