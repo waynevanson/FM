@@ -1,5 +1,6 @@
 mod editor;
 mod envelope;
+mod event;
 mod params;
 
 use editor::FmSynthEditor;
