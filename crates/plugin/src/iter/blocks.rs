@@ -1,4 +1,4 @@
-use crate::event::{EventsIntoIter, IntoEventsIntoIter};
+use super::event::{EventsIntoIter, IntoEventsIntoIter};
 use nih_plug::{
     buffer::Buffer, context::process::ProcessContext, midi::PluginNoteEvent,
     plugin::Plugin as PluginTrait,

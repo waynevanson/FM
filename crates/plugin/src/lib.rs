@@ -1,7 +1,6 @@
-mod blocks;
 mod editor;
 mod envelope;
-mod event;
+mod iter;
 mod params;
 
 use editor::FmSynthEditor;
