@@ -1,3 +1,4 @@
+mod blocks;
 mod editor;
 mod envelope;
 mod event;
