@@ -2,7 +2,7 @@ mod editor;
 mod envelope;
 mod params;
 
-use editor::FmSynthEditor;
+use editor::{FmSynthEditor, FmSynthEditorState, FmSynthEditorValues};
 use envelope::Envelope;
 use nih_plug::prelude::*;
 use nih_plug_iced::create_iced_editor;
@@ -25,8 +25,11 @@ pub const GAIN_POLY_MOD_ID: u32 = 0;
 
 /// A simple polyphonic synthesizer with support for CLAP's polyphonic modulation. See
 /// `NoteEvent::PolyModulation` for another source of information on how to use this.
-struct PolyModSynth {
+struct FmSynth {
     params: Arc<FmSynthParams>,
+
+    /// State that relies on values passed from the plugin to the GUI that aren't in the params.
+    values: Arc<FmSynthEditorValues>,
     /// A pseudo-random number generator. This will always be reseeded with the same seed when the
     /// synth is reset. That way the output is deterministic when rendering multiple times.
     prng: Pcg32,
@@ -72,11 +75,11 @@ struct Voice {
     voice_gain: Option<(f32, Smoother<f32>)>,
 }
 
-impl Default for PolyModSynth {
+impl Default for FmSynth {
     fn default() -> Self {
         Self {
-            params: Arc::new(FmSynthParams::default()),
-
+            params: Arc::default(),
+            values: Arc::default(),
             prng: Pcg32::new(420, 1337),
             // `[None; N]` requires the `Some(T)` to be `Copy`able
             voices: [0; NUM_VOICES as usize].map(|_| None),
@@ -85,7 +88,7 @@ impl Default for PolyModSynth {
     }
 }
 
-impl Plugin for PolyModSynth {
+impl Plugin for FmSynth {
     const NAME: &'static str = "FM";
     const VENDOR: &'static str = "Wayne Van Son";
     const URL: &'static str = "https://youtu.be/dQw4w9WgXcQ";
@@ -122,7 +125,10 @@ impl Plugin for PolyModSynth {
     }
 
     fn editor(&mut self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
-        create_iced_editor::<FmSynthEditor>(self.params.editor_state.clone(), self.params.clone())
+        create_iced_editor::<FmSynthEditor>(
+            self.params.editor_state.clone(),
+            (self.params.clone(), self.values.clone()),
+        )
     }
 
     fn process(
@@ -398,6 +404,31 @@ impl Plugin for PolyModSynth {
             }
 
             // And then just keep processing blocks until we've run out of buffer to fill
+
+            if self.params.editor_state.is_open() {
+                let blocked = output[0][block_start..block_end]
+                    .into_iter()
+                    .copied()
+                    .sum::<f32>()
+                    .abs();
+                let amplitude = (blocked / block_len as f32).abs();
+                // let current_peak_meter = self
+                //     .values
+                //     .peak_meter
+                //     .load(std::sync::atomic::Ordering::Relaxed);
+                // let new_peak_meter = if amplitude > current_peak_meter {
+                //     amplitude
+                // } else {
+                //     current_peak_meter * self.peak_meter_decay_weight
+                //         + amplitude * (1.0 - self.peak_meter_decay_weight)
+                // };
+                let new_peak_meter = amplitude;
+
+                self.values
+                    .peak_meter
+                    .store(new_peak_meter, std::sync::atomic::Ordering::Relaxed)
+            }
+
             block_start = block_end;
             block_end = (block_start + MAX_BLOCK_SIZE).min(num_samples);
         }
@@ -406,7 +437,7 @@ impl Plugin for PolyModSynth {
     }
 }
 
-impl PolyModSynth {
+impl FmSynth {
     /// Get the index of a voice by its voice ID, if the voice exists. This does not immediately
     /// reutnr a reference to the voice to avoid lifetime issues.
     fn get_voice_idx(&mut self, voice_id: i32) -> Option<usize> {
@@ -554,7 +585,7 @@ const fn compute_fallback_voice_id(note: u8, channel: u8) -> i32 {
     note as i32 | ((channel as i32) << 16)
 }
 
-impl ClapPlugin for PolyModSynth {
+impl ClapPlugin for FmSynth {
     const CLAP_ID: &'static str = "com.waynevanson.fm";
     const CLAP_DESCRIPTION: Option<&'static str> =
         Some("A simple polyphonic synthesizer with support for polyphonic modulation");
@@ -579,7 +610,7 @@ impl ClapPlugin for PolyModSynth {
 
 // The VST3 verison of this plugin isn't too interesting as it will not support polyphonic
 // modulation
-impl Vst3Plugin for PolyModSynth {
+impl Vst3Plugin for FmSynth {
     const VST3_CLASS_ID: [u8; 16] = *b"Wynvenavs32sssfm";
     const VST3_SUBCATEGORIES: &'static [Vst3SubCategory] = &[
         Vst3SubCategory::Instrument,
@@ -588,5 +619,5 @@ impl Vst3Plugin for PolyModSynth {
     ];
 }
 
-nih_export_clap!(PolyModSynth);
-nih_export_vst3!(PolyModSynth);
+nih_export_clap!(FmSynth);
+nih_export_vst3!(FmSynth);
